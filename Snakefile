@@ -1,6 +1,67 @@
+import json
+
 configfile: "config.json"
 
-params = config['params']
+def data(path):
+    return os.path.join(config['data'], path)
+
+def ref(path):
+    return os.path.join(config['ref'], path)
+
+def log(path):
+    return os.path.join(config['logs'], path)
+
+def result(path):
+    return os.path.join(config['result'], path)
+
+def etc(path):
+    return os.path.join(config['etc'], path)
+
+
+try:
+    with open(etc("params.json")) as f:
+        parameters = json.load(f)
+except OSError as e:
+    print("Could not read parameter file: " + str(e), file=sys.stderr)
+    sys.exit(1)
+except ValueError as e:
+    print("Invalid parameter file: " + str(e), file=sys.stderr)
+    sys.exit(1)
+
+default_params = {
+    "stranded": 'yes',
+    "overlap_mode": 'union',
+    "normalize_counts": "deseq2",
+    "gff_attribute": 'gene_id',
+    "feature_type": 'exon',
+}
+default_params.update(parameters)
+parameters = default_params
+
+
+INPUT_FILES = []
+for name in os.listdir(DATA):
+    if name.lower().endswith('.sha256sum'):
+        continue
+    if name.lower().endswith('.fastq'):
+        if not name.endswith('.fastq'):
+            print("Extension fastq is case sensitive.", file=sys.stderr)
+            exit(1)
+        INPUT_FILES.append(os.path.basename(name)[:-6])
+    elif name.lower().endswith('.fastq.gz'):
+        if not name.endswith('.fastq.gz'):
+            print("Extension fastq is case sensitive.", file=sys.stderr)
+            exit(1)
+        INPUT_FILES.append(os.path.basename(name)[:-len('.fastq.gz')])
+    else:
+        print("Unknown data file: %s" % name, file=sys.stderr)
+        exit(1)
+
+if len(set(INPUT_FILES)) != len(INPUT_FILES):
+    print("Some input file names are not unique")
+    exit(1)
+
+
 
 def fastq_per_group(wildcards):
     pool = wildcards['pool']
