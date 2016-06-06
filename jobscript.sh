@@ -1,19 +1,27 @@
 #!/bin/sh
 #PBS -q cfc
 #PBS -A qbic
-#PBS -l nodes=1:ppn=2:cfc
-#PBS -l walltime=40:00:00
 #PBS -e ../logs/jobscript.{job.rule.name}.e$PBS_JOBID
 #PBS -o ../logs/jobscript.{job.rule.name}.o$PBS_JOBID
+#PBS -l nodes=1:ppn=10:cfc
+#PBS -l walltime=30:00:00
+#PBS -l mem=50g
 # properties = {properties}
 
 set -e
 
-module load bio/fastqc/0.10
+echo Running on machine $(hostname)
+
 module load qbic/anaconda
-module load qbic/htseq/0.6.1p2
-module load qbic/tophat
+module load devel/java_jdk/1.7.0u45
 module load bio/samtools/1.2
+module load qbic/ngs-bits
+module load qbic/bwa
+module load qbic/stampy
+module load qbic/picard/git
+module load bio/gatk/3.3
+module load qbic/annovar/0.1
+
 
 {exec_job}
 exit 0

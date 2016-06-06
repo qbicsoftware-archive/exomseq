@@ -20,6 +20,8 @@ with open(snake_out, 'w') as out, open(snake_err, 'w') as err:
             "--rerun-incomplete",
             "-j", "100",
             "--stats", stats_path,
+            "-T",
+            "-k",
         ],
         stdout=out, stderr=err
     )
