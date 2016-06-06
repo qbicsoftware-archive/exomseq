@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import hashlib
 import subprocess
+import json
 
 configfile: "config.json"
 
@@ -15,7 +16,26 @@ LOGS = config['logs']
 REF = config['ref']
 INI_PATH = config['etc']
 SNAKEDIR = config['src']
-params = config['params']
+
+
+try:
+    with open(etc("params.json")) as f:
+        parameters = json.load(f)
+except OSError as e:
+    print("Could not read parameter file: " + str(e), file=sys.stderr)
+    sys.exit(1)
+except ValueError as e:
+    print("Invalid parameter file: " + str(e), file=sys.stderr)
+    sys.exit(1)
+
+default_params = {}
+default_params.update(parameters)
+parameters = default_params
+
+parameters['indexed_genome'] = ref(parameters['indexed_genome'])
+indexed_genome = parameters["indexed_genome"]
+if not os.path.exists(indexed_genome + '.fa'):
+    raise ValueError("Could not find indexed genome file %s" % indexed_genome)
 
 
 def data(path):
@@ -65,7 +85,7 @@ def fastq_per_group(wildcards):
         return ['/i_do_not_exist']
     names = pools[pool][group]
     return expand(data("{name}.fastq.gz"), name=names)
-              
+
 all_files = []
 for pool in pools.values():
     for group in pool.values():
@@ -75,9 +95,9 @@ for pool in pools.values():
 def groups_per_pool(format_string):
     def inner(wildcards):
         pool = wildcards['pool']
-        if pool not in params['pools']:
+        if pool not in parameters['pools']:
             return ["/i_do_not_exist"]
-        groups = params['pools'][pool]
+        groups = parameters['pools'][pool]
         group_names = groups.keys()
         return expand(format_string, pool=[pool], group=group_names)
     return inner
@@ -204,7 +224,7 @@ rule map_bwa:
     run:
         # TODO additional header LB (library)?
         options = r"-M -R '@RG\tID:{group}\tSM:{group}'".format(**wildcards)
-        options = options + " " + ref(str(config['params']['fasta']))
+        options = options + " " + indexed_genome
         shell("bwa mem -t {threads} %s {input}/forward.fastq.gz {input}/backward.fastq.gz > {output}" % options)
 
 
@@ -240,7 +260,7 @@ rule map_stampy:
     run:
         shell("stampy.py -g {fasta} -h {fasta} "
               "--readgroup=ID:{group} --bamkeepgoodreads -M "
-              "{input} -o {output}".format(fasta=ref(config['params']['fasta']),
+              "{input} -o {output}".format(fasta=indexed_genome,
                                            input=input,
                                            output=output,
                                            **wildcards))
@@ -271,7 +291,7 @@ rule left_align:
     output: "left_align/{name}.unsorted.bam"
     run:
         shell("BamLeftAlign -in {input.bam} -out {output} -ref %s.fa"
-               % ref(config['params']['fasta']))
+               % indexed_genome)
 
 
 rule re_align_intervals:
@@ -284,8 +304,7 @@ rule re_align_intervals:
                "-I {input.bam} "
                "-R %s.fa "
                "-o {output}")
-              % (os.environ['GATK_JARS'],
-                 ref(config['params']['fasta'])))
+              % (os.environ['GATK_JARS'], indexed_genome))
         #"--intervals {config['intervals']}")
 
 
@@ -301,8 +320,7 @@ rule re_align:
                "-R %s.fa "
                "--targetIntervals {input.intervals} "
                "-o {output}")
-              % (os.environ['GATK_JARS'],
-                 ref(config['params']['fasta'])))
+              % (os.environ['GATK_JARS'], indexed_genome))
 
 
 rule clip_overlap:
@@ -358,10 +376,10 @@ rule merge_sam_index:
 ## create basic variant calls ,here with freebayes
 rule freebayes:
     input: bam="merged_bam/merged_sorted.bam", \
-           bai="merged_bam/merged_sorted.bam.bai" 
+           bai="merged_bam/merged_sorted.bam.bai"
     output: "vcf_base/merged_base.vcf"
     run:
-        shell("/lustre_cfc/software/qbic/freebayes/bin/freebayes --min-base-quality 20 --min-alternate-qsum 90 -f %s.fa -b {input.bam} > {output}" % ref(config['params']['fasta']))
+        shell("/lustre_cfc/software/qbic/freebayes/bin/freebayes --min-base-quality 20 --min-alternate-qsum 90 -f %s.fa -b {input.bam} > {output}" % indexed_genome)
 
 
 ## filter variants according to variant quality>5 , alternate observations>=2, vcflib is needed and was installed with git clone --recursive git://github.com/ekg/vcflib.git, cd vcflib and make under qbic/software...
@@ -381,7 +399,7 @@ rule split_complex_variants:
         shell("/lustre_cfc/software/qbic/vcflib/bin/vcfallelicprimitives -kg {input} > {output}")
 
 
-## as the error ocurred Error : [E::bcf_calc_ac] Incorrect AN/AC counts at chr1:85062524 the next rule vcffixup had to be added. Why?: 
+## as the error ocurred Error : [E::bcf_calc_ac] Incorrect AN/AC counts at chr1:85062524 the next rule vcffixup had to be added. Why?:
 ## To follow up on this, the issue is due to having an improper AN allele output coming from splitting up FreeBayes MNP calls.
 ## It looks like the problem is that vcfallelicprimitives, which splits MNPs from FreeBayes output, creates invalid AN fields.
 ## These should be a single integer but in cases where you have multiple alleles and a MNP, it produces an allele based list:
@@ -406,7 +424,7 @@ rule split_multiallelic_variants:
 #    input: "vcf_split/merged_split.vcf"
 #    output: "vcf_aligned/merged_aligned.vcf"
 #    run:
-#        shell("VcfLeftAlign -in {input} -out {output} -ref %s.fa" 
+#        shell("VcfLeftAlign -in {input} -out {output} -ref %s.fa"
 #               % ref(config['params']['fasta']))
 
 ## align INDELs to the left. Note that complex indels and multi-allelic deletions are not shifted!
@@ -416,7 +434,7 @@ rule re_align_INDELS:
     output: "vcf_aligned/merged_aligned.vcf"
     run:
         shell("/lustre_cfc/software/qbic/bcftools-1.2/bin/bcftools norm -f %s.fa {input} -o {output}"
-                % ref(config['params']['fasta']))
+                % indexed_genome)
 
 
 ## sort variants by genomic position
@@ -447,7 +465,7 @@ rule sort_variants:
 ## 1) annovar annotation
 ## module is installed by Chris
 ## in /lustre_cfc/qbic/reference_genomes/ I downloaded database for annovar via annotate_variation.pl -buildver mm10 -downdb refGene mm10db_annovar/
-## then check the log file in mm10db_annovar/ 
+## then check the log file in mm10db_annovar/
 ## #NOTICE: the FASTA file http://www.openbioinformatics.org/annovar/download mm10_refGeneMrna.fa.gz is not available to download but can be generated by the ANNOVAR software. PLEASE RUN THE FOLLOWING TWO COMMANDS CONSECUTIVELY TO GENERATE THE FASTA FILES:
 ## annotate_variation.pl --buildver mm10 --downdb seq mm10db_annovar/mm10_seq
 ## retrieve_seq_from_fasta.pl mm10db_annovar/mm10_refGene.txt -seqdir mm10db_annovar/mm10_seq -format refGene -outfile mm10db_annovar/mm10_refGeneMrna.fa
@@ -484,7 +502,7 @@ rule annovar_annotate:
 ## in snpeff.config file changed data.dir: data.dir = /lustre_cfc/qbic/reference_genomes/snpeff
 ## run example
 ## java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar eff -c /lustre_cfc/software/qbic/snpEff/snpEff.config -noStats -noLog -v GRCm38.79 sample_sorted.vcf > sample_sorted.snpeff.ann.vcf
-## as pointed out in the command above direct to config with -c, set a version of the genome (should be found within databases available, see above command) 
+## as pointed out in the command above direct to config with -c, set a version of the genome (should be found within databases available, see above command)
 ## also make sure a directory exists in data.dir named here GRCm38.79, then the db will be stored there.
 ## from Marc Sturm's commands leave out -spliceRegionIntronMax as not clear how to set this here
 ## #updated also the config file to add a line for Mitochondrial DNA for my genome: GRCm38.79.MT.codonTable : Vertebrate_Mitochondrial
@@ -495,7 +513,3 @@ rule snpeff:
     output: "snpeff/merged_sorted.snpeff.vcf"
     run:
         shell("java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar eff -c /lustre_cfc/software/qbic/snpEff/snpEff.config -v -cancer -cancerSamples {input.file} -noLog hg19 {input.vcf} > {output}")
-
-
-
-
