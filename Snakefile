@@ -17,10 +17,26 @@ REF = config['ref']
 INI_PATH = config['etc']
 SNAKEDIR = config['src']
 
+def data(path):
+    return os.path.join(DATA, path)
+
+def ref(path):
+    return os.path.join(REF, path)
+
+def log(path):
+    return os.path.join(LOGS, path)
+
+def result(path):
+    return os.path.join(RESULT, path)
+
+def etc(path):
+    return os.path.join(INI_PATH, path)
 
 try:
     with open(etc("params.json")) as f:
         parameters = json.load(f)
+
+
 except OSError as e:
     print("Could not read parameter file: " + str(e), file=sys.stderr)
     sys.exit(1)
@@ -38,20 +54,6 @@ if not os.path.exists(indexed_genome + '.fa'):
     raise ValueError("Could not find indexed genome file %s" % indexed_genome)
 
 
-def data(path):
-    return os.path.join(DATA, path)
-
-def ref(path):
-    return os.path.join(REF, path)
-
-def log(path):
-    return os.path.join(LOGS, path)
-
-def result(path):
-    return os.path.join(RESULT, path)
-
-def etc(path):
-    return os.path.join(INI_PATH, path)
 
 def read_design():
     df = pd.read_csv(etc('design.csv'), sep='\t')
