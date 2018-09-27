@@ -5,8 +5,8 @@ samtools Version 1.3
 bwa Version 0.7.10-r789  
 Picard Version: 1.137  
 tools from ngs-bits (https://github.com/imgag/ngs-bits) such as  
-  SeqPurge Version (0.1-4-gaed0c94)
-  BamClipOverlap Version (0.1-4-gaed0c94)  
+  --SeqPurge Version (0.1-4-gaed0c94)  
+  --BamClipOverlap Version (0.1-4-gaed0c94)  
 Freebayes Version: v0.9.21-19-gc003c1e  
 ...
 
@@ -37,7 +37,7 @@ The input Fastq files (not fastq.gz, unzip them before) should be copied in the 
 Correct filenames that would work are `sample1_R1.fastq` and `sample1_R2.fastq`, but not `sample1_L001_R1.fastq` and `sample1_L001_R2.fastq`. That means you want to avoid '_' anywhere else than before the R1 and R2 of the filename.
 
 
-4) File grouping
+4) File grouping  
 The input files (see point 3)) need to be grouped in such a way that the workflow knows which forward (R1) and reverse (R2) file belongs together. This is done with a file named "design.csv" (content however, should be tab separated) that should be generated in `etc` that should look like this:
 
 ```
@@ -45,9 +45,10 @@ Identifier	SAMPLE TYPE
 sample1	Q_TEST_SAMPLE
 sample2	Q_TEST_SAMPLE
 ```
-The column Identifier is used to group the fastq files in `data` into sample groups (here sample1 and sample2). The column SAMPLE TYPE is just set to a string (here Q_TEST_SAMPLE) to select the right
+The column Identifier is used to group the fastq files in `data` into sample groups (here sample1 and sample2). The column SAMPLE TYPE is just set to a string (here Q_TEST_SAMPLE) to select the right lines of the "design.csv" file. Just copy that over to your own design.csv file.  
 
 
+5) Run the workflow  
 To run the workflow navigate to the `src` folder.
 Using `snakemake -n` one can display the operations the workflow will perform.
 Using the `--dag` parameter and piping it to `dot` one can create a .pdf version of the directed acyclic graph used by snakemake to inspect the behavious of the workflow on a local machine.
