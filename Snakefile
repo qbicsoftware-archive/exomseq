@@ -65,28 +65,28 @@ def read_design():
     pool = {}
     pools['all'] = pool
 
-    files = os.listdir(DATA)
+    files = sorted(os.listdir(DATA))
 
     for barcode in test_samples.Identifier:
-        sample_files = [file.split('.')[0] for file in files if (file.startswith(barcode) & file.endswith('.gz'))]
+        sample_files = [file.split('.')[0] for file in files if (file.startswith(barcode) & file.endswith('.fastq'))]
         if len(sample_files) == 2:
             pool[barcode] = sample_files
     return pools
 
 pools = read_design()
 
-print(pools)
+##print(pools)
 
 def fastq_per_group(wildcards):
     pool = wildcards['pool']
     group = wildcards['group']
-    print(group)
+    ##print(group)
     if pool not in pools:
         return ['/i_do_not_exist']
     if group not in pools[pool]:
         return ['/i_do_not_exist']
     names = pools[pool][group]
-    return expand(data("{name}.fastq.gz"), name=names)
+    return expand(data("{name}.fastq"), name=names)
 
 all_files = []
 for pool in pools.values():
@@ -124,26 +124,26 @@ ID="merged"
 
 rule all:
     input:
-        expand("checksums/{name}.txt", name=all_files),
+        #expand("checksums/{name}.txt", name=all_files),
         #expand("mapqc/{pool}.qcML", pool=pools.keys()),
-        expand_pools_groups(result("{pool}_{group}_readqc.qcML")),
+        #expand_pools_groups(result("{pool}_{group}_readqc.qcML")),
         expand("fastqc/{name}", name=all_files),
         expand_pools_groups("trim_fastqc/{pool}_{group}"),
         #expand_pools_groups("stampy/{pool}_{group}.sorted.bam.flagstat"),
         expand_pools_groups("map_bwa/{pool}_{group}.sorted.bam.flagstat"),
         expand_pools_groups("duplicates/{pool}_{group}.sorted.bam"),
         expand_pools_groups("clipped/{pool}_{group}.sorted.bam.flagstat"),
-        expand_pools_groups("mapqc/{pool}_{group}.qcML"),
+        #expand_pools_groups("mapqc/{pool}_{group}.qcML"),
         expand_pools_groups("fastqc_clipped/{pool}_{group}"),
         #expand("fastqc_clipped/{pool}", pool=pools.keys())
         #expand("map_fastqc/{pool}.qcML", pool=pools.keys())
         #expand("result/{name}.qcML", name=all_files)
         expand("merged_bam/{id}_sorted.bam",id=ID),
         expand("merged_bam/{id}_sorted.bam.bai",id=ID),
-        expand("annovar/annovar_in/{id}_sorted.vcf.avinput",id=ID),
-        expand("annovar/annovar_out/{id}_sorted.vcf.avoutput",id=ID),
-        expand("snpeff/{id}_sorted.snpeff.vcf",id=ID)
-
+        #expand("annovar/annovar_in/{id}_sorted.vcf.avinput",id=ID),
+        #expand("annovar/annovar_out/{id}_sorted.vcf.avoutput",id=ID),
+	#expand("snpeff/{id}_sorted.snpeff.vcf",id=ID),
+        expand("vcf_sorted/{id}_sorted.vcf",id=ID)
 
 
 rule verify_checksums:
@@ -180,7 +180,7 @@ rule read_qc:
 
 
 rule fastqc:
-    input: data("{name}.fastq.gz")
+    input: data("{name}.fastq")
     output: "fastqc/{name}"
     run:
         try:
@@ -248,6 +248,7 @@ rule sam_index:
     run:
         shell("samtools index {input}")
 
+
 rule sam_index_unsorted:
     input: "{file}.unsorted.bam"
     output: "{file}.unsorted.bam.bai"
@@ -261,7 +262,7 @@ rule map_stampy:
     output: "stampy/{pool}_{group}.unsorted.sam"
     run:
         shell("stampy.py -g {fasta} -h {fasta} "
-              "--readgroup=ID:{group} --bamkeepgoodreads -M "
+              "--readgroup=ID:{group} -t8 --bamkeepgoodreads -M "
               "{input} -o {output}".format(fasta=indexed_genome,
                                            input=input,
                                            output=output,
@@ -329,15 +330,16 @@ rule clip_overlap:
     input: bam="realigned/{name}.unsorted.bam", \
            bai="realigned/{name}.unsorted.bam.bai"
     output: "clipped/{name}.unsorted.bam"
-    run:
-        shell("BamClipOverlap -in {input.bam} -out {output}")
+    #resources: mem=200000
+    shell:
+         "BamClipOverlap -in {input.bam} -out {output}"
 
 
-rule mapqc:
-    input: bam="clipped/{name}.sorted.bam",\
-           bai="clipped/{name}.sorted.bam.bai"
-    output: "mapqc/{name}.qcML"
-    shell: "MappingQC -in {input.bam} -out {output} -wgs hg19"
+#rule mapqc:
+#    input: bam="clipped/{name}.sorted.bam",\
+#           bai="clipped/{name}.sorted.bam.bai"
+#    output: "mapqc/{name}.qcML"
+#    shell: "MappingQC -in {input.bam} -out {output} -wgs hg19"
 
 rule fastqc_clipped:
     input: "clipped/{pool}.sorted.bam"
@@ -380,6 +382,7 @@ rule freebayes:
     input: bam="merged_bam/merged_sorted.bam", \
            bai="merged_bam/merged_sorted.bam.bai"
     output: "vcf_base/merged_base.vcf"
+    #resources: mem=200000
     run:
         shell("/lustre_cfc/software/qbic/freebayes/bin/freebayes --min-base-quality 20 --min-alternate-qsum 90 -f %s.fa -b {input.bam} > {output}" % indexed_genome)
 
@@ -454,64 +457,10 @@ rule sort_variants:
         shell("cat {input} | /lustre_cfc/software/qbic/vcftools_0.1.13/bin/vcf-sort > {output}")
 
 
-#####
-## some stats on base calling, filtered calling and final output which is the coordinate sorted vcf file
-#####
 
 
 
 
 
-### annotation
-
-## 1) annovar annotation
-## module is installed by Chris
-## in /lustre_cfc/qbic/reference_genomes/ I downloaded database for annovar via annotate_variation.pl -buildver mm10 -downdb refGene mm10db_annovar/
-## then check the log file in mm10db_annovar/
-## #NOTICE: the FASTA file http://www.openbioinformatics.org/annovar/download mm10_refGeneMrna.fa.gz is not available to download but can be generated by the ANNOVAR software. PLEASE RUN THE FOLLOWING TWO COMMANDS CONSECUTIVELY TO GENERATE THE FASTA FILES:
-## annotate_variation.pl --buildver mm10 --downdb seq mm10db_annovar/mm10_seq
-## retrieve_seq_from_fasta.pl mm10db_annovar/mm10_refGene.txt -seqdir mm10db_annovar/mm10_seq -format refGene -outfile mm10db_annovar/mm10_refGeneMrna.fa
-## check under /lustre_cfc/qbic/reference_genomes/mm10db_annovar/ how it eventually looks like
-
-rule annovar_convert:
-    input: "vcf_sorted/merged_sorted.vcf"
-    output: "annovar/annovar_in/merged_sorted.vcf.avinput"
-    run:
-        try:
-            shell("convert2annovar.pl -format vcf4 --allsample --withfreq --includeinfo {input} --outfile {output}")
-        except subprocess.CalledProcessError:
-            pass
-        shell("convert2annovar.pl -format vcf4old --withfreq --includeinfo {input} --outfile {output}")
-    #### the option --allsample is supported only if --format is 'vcf4'
 
 
-rule annovar_annotate:
-    input: "annovar/annovar_in/merged_sorted.vcf.avinput"
-    output: "annovar/annovar_out/merged_sorted.vcf.avoutput"
-    run:
-        shell("annotate_variation.pl -buildver hg19 --otherinfo --infoasscore {input} > {output} --outfile {output} /lustre_cfc/qbic/reference_genomes/humandb_annovar/")
-
-
-
-
-## 2) snpeff annotation
-## installed snpeff under /qbic/software but not as module yet
-## to check what databases are available you can do:
-## java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar databases | less
-## #to find mouse specific stuff:
-## java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar databases | grep -i musculus
-## Note: If you are running SnpEff from a directory different than the one it was installed, you will have to specify where the config file is. This is done using the '-c' command line option:
-## in snpeff.config file changed data.dir: data.dir = /lustre_cfc/qbic/reference_genomes/snpeff
-## run example
-## java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar eff -c /lustre_cfc/software/qbic/snpEff/snpEff.config -noStats -noLog -v GRCm38.79 sample_sorted.vcf > sample_sorted.snpeff.ann.vcf
-## as pointed out in the command above direct to config with -c, set a version of the genome (should be found within databases available, see above command)
-## also make sure a directory exists in data.dir named here GRCm38.79, then the db will be stored there.
-## from Marc Sturm's commands leave out -spliceRegionIntronMax as not clear how to set this here
-## #updated also the config file to add a line for Mitochondrial DNA for my genome: GRCm38.79.MT.codonTable : Vertebrate_Mitochondrial
-
-rule snpeff:
-    input: vcf="vcf_sorted/merged_sorted.vcf",\
-           file="../etc/header_add.1.txt"
-    output: "snpeff/merged_sorted.snpeff.vcf"
-    run:
-        shell("java -Xmx4g -jar /lustre_cfc/software/qbic/snpEff/snpEff.jar eff -c /lustre_cfc/software/qbic/snpEff/snpEff.config -v -cancer -cancerSamples {input.file} -noLog hg19 {input.vcf} > {output}")
