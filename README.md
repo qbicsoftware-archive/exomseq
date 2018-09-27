@@ -21,7 +21,7 @@ The workflow uses a module system to load the required software. Be sure to chec
 qproject create -t . -w github:qbicsoftware/exomseq
 ```
 
-Be sure to add a config file "params.json" in `etc` which should look like this:
+2) Be sure to add a config file "params.json" in `etc` which should look like this:
 
 ```
 {
@@ -31,15 +31,22 @@ Be sure to add a config file "params.json" in `etc` which should look like this:
 where `indexed_genome` gives the full path to the genome fasta file. Here in this example in the folder /<folder_to_index>/BWAIndex/hg19/ live all files from the BWA index (created with the command: bwa index -p hg19 -a bwtsw hg19.fa) plus the genome fasta file hg19.fa. The basename of the files must be identical such as here hg19.fa and hg19.amb etc.  
 You also need a samtools faidx created index file here (such as hg19.fa.fai) and a picard dict file (such as hg19.dict).   
 
-Also add a "design.csv" file (content however, should be tab separated) in `etc` that should look like this:
+
+3) Input Fastq files  
+The input Fastq files (not fastq.gz, unzip them before) should be copied in the folder `data`.   
+Correct filenames that would work are `sample1_R1.fastq` and `sample1_R2.fastq`, but not `sample1_L001_R1.fastq` and `sample1_L001_R2.fastq`. That means you want to avoid '_' anywhere else than before the R1 and R2 of the filename.
+
+
+4) File grouping
+The input files (see point 3)) need to be grouped in such a way that the workflow knows which forward (R1) and reverse (R2) file belongs together. This is done with a file named "design.csv" (content however, should be tab separated) that should be generated in `etc` that should look like this:
 
 ```
 Identifier	SAMPLE TYPE
 sample1	Q_TEST_SAMPLE
 sample2	Q_TEST_SAMPLE
 ```
+The column Identifier is used to group the fastq files in `data` into sample groups (here sample1 and sample2). The column SAMPLE TYPE is just set to a string (here Q_TEST_SAMPLE) to select the right
 
-The Fastq files (not fastq.gz, unzip them before) should be copied in the folder `data`. Correct filenames that would work are `sample1_R1.fastq` and `sample1_R2.fastq`, but not `sample1_L001_R1.fastq` and `sample1_L001_R2.fastq`. That means you want to avoid '_' anywhere else than before the R1 and R2 of the filename.
 
 To run the workflow navigate to the `src` folder.
 Using `snakemake -n` one can display the operations the workflow will perform.
