@@ -31,7 +31,7 @@ Be sure to add a config file "params.json" in `etc` which should look like this:
 where `indexed_genome` gives the full path to the genome fasta file. Here in this example in the folder /<folder_to_index>/BWAIndex/hg19/ live all files from the BWA index (created with the command: bwa index -p hg19 -a bwtsw hg19.fa) plus the genome fasta file hg19.fa. The basename of the files must be identical such as here hg19.fa and hg19.amb etc.  
 You also need a samtools faidx created index file here (such as hg19.fa.fai) and a picard dict file (such as hg19.dict).   
 
-Also add a "design.csv" file in `etc` that should look like this:
+Also add a "design.csv" file (content however, should be tab separated) in `etc` that should look like this:
 
 ```
 Identifier	SAMPLE TYPE
