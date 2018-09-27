@@ -3,7 +3,7 @@
 #PBS -A qbic
 #PBS -e ../logs/jobscript.{job.rule.name}.e$PBS_JOBID
 #PBS -o ../logs/jobscript.{job.rule.name}.o$PBS_JOBID
-#PBS -l nodes=1:ppn=10:cfc
+#PBS -l nodes=1:ppn=6:cfc
 #PBS -l walltime=30:00:00
 #PBS -l mem=50g
 # properties = {properties}
