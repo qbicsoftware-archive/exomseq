@@ -75,7 +75,7 @@ While running one can inspect the log files in `logs` (e.g. in a different scree
 cd logs/
 tail snake.err -f
 ```
-To check the jobs on the computing cluster one can use `qstat`.
+To check the jobs on the computing cluster one can use `qstat` or `showq`.
 
 The results are written into the folder `var`.
 
