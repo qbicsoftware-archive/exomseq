@@ -52,7 +52,7 @@ The column Identifier is used to group the fastq files in `data` into sample gro
 5) Check the workflow (Snakemake's `dry run`)
 To run the workflow navigate to the `src` folder.
 Using `snakemake -n` one can display the operations the workflow will perform.
-Using the `--dag` parameter and piping it to `dot` one can create a .pdf version of the directed acyclic graph used by snakemake to inspect the behavious of the workflow on a local machine.
+Using the `--dag` parameter and piping it to `dot` one can create a .pdf version of the directed acyclic graph used by snakemake to inspect the behaviour of the workflow on a local machine. See the "dag.pdf" file as example.
 
 ```
 module load qbic/anaconda
